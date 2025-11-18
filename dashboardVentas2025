@@ -1,0 +1,78 @@
+import pandas as pd
+
+import streamlit as st
+import pandas as pd
+import plotly.express as px
+
+# --- Configuración de Streamlit ---
+st.set_page_config(layout="wide")
+st.title('Análisis de Ventas')
+
+# --- Carga de Datos ---
+@st.cache_data
+def load_data(file_path):
+    try:
+        df = pd.read_excel(file_path)
+        return df
+    except Exception as e:
+        st.error(f"Error al cargar el archivo: {e}")
+        return pd.DataFrame()
+
+file_path_salida = 'SalidaVentas.xlsx'
+df_salida = load_data(file_path_salida)
+
+if not df_salida.empty:
+    st.subheader('Vista Previa de los Datos')
+    st.dataframe(df_salida.head())
+
+    # --- Función para envolver texto --- 
+    def wrap_label_in_3_rows(label):
+        words = label.split()
+        if not words:
+            return label
+
+        lines = []
+        current_line = []
+        total_words = len(words)
+        target_words_per_line = (total_words + 2) // 3
+
+        for word in words:
+            if len(current_line) < target_words_per_line or len(lines) == 2:
+                current_line.append(word)
+            else:
+                lines.append(' '.join(current_line))
+                current_line = [word]
+        lines.append(' '.join(current_line))
+
+        while len(lines) > 3 and len(lines) > 0:
+            if len(lines) >= 2:
+                last_line = lines.pop()
+                second_to_last_line = lines.pop()
+                lines.append(f"{second_to_last_line} {last_line}")
+
+        return '<br>'.join(lines)
+
+    # --- Gráfica de Top 5 Productos Más Vendidos (por Cantidad) ---
+    st.subheader('Top 5 Productos Más Vendidos (por Cantidad)')
+    top_5_products = df_salida.groupby('Product Name')['Quantity'].sum().sort_values(ascending=False).head(5).reset_index()
+    top_5_products['Wrapped Product Name'] = top_5_products['Product Name'].apply(wrap_label_in_3_rows)
+    
+    fig_quantity = px.bar(top_5_products, x='Wrapped Product Name', y='Quantity',
+                         title='Top 5 Productos Más Vendidos (por Cantidad)',
+                         labels={'Wrapped Product Name': 'Nombre del Producto', 'Quantity': 'Cantidad Vendida'})
+    fig_quantity.update_layout(
+        xaxis_tickangle=0,
+        xaxis_automargin=True,
+        height=500
+    )
+    st.plotly_chart(fig_quantity, use_container_width=True)
+
+    # --- Gráfica de Top 5 Productos con Mayores Ganancias (por Beneficio) ---
+    st.subheader('Top 5 Productos con Mayores Ganancias (por Beneficio)')
+    top_5_profit_products = df_salida.groupby('Product Name')['Profit'].sum().sort_values(ascending=False).head(5).reset_index()
+    
+    fig_profit = px.bar(top_5_profit_products, x='Product Name', y='Profit',
+                        title='Top 5 Productos con Mayores Ganancias (por Beneficio)',
+                        labels={'Product Name': 'Nombre del Producto', 'Profit': 'Ganancia Total'})
+    fig_profit.update_layout(xaxis_tickangle=-45)
+    st.plotly_chart(fig_profit, use_container_width=True)
